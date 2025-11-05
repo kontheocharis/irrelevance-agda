@@ -1,0 +1,8 @@
+name: irrelevance-agda
+depend: standard-library cubical
+include: .
+flags:
+  --cubical
+  --prop
+  --rewriting
+  -WnoUnsupportedIndexedMatch
