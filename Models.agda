@@ -4,6 +4,7 @@ open import Agda.Primitive
 open import Cubical.Foundations.Prelude
 open import Cubical.Foundations.Equiv
 open import Cubical.Data.Unit
+open import Cubical.Data.Nat hiding (zero)
 
 open import Theories
 
@@ -19,13 +20,16 @@ propFunExt h i x = h x i
 exfalso : ∀ {ℓ} {A : Type ℓ} → ⊥ → A
 exfalso ()
 
+open ITT 
+open ITT-sorts 
+open ITT-ctors
+
 -- MLTT model of ITT
+
+-- Ignores irrelevance.
 
 module MLTT-ITT {ℓ} {ℓ'} (m : MLTT {ℓ} {ℓ'}) where
   open MLTT
-  open ITT 
-  open ITT-sorts 
-  open ITT-ctors
 
   i-sorts : ITT-sorts {lzero} {ℓ} {ℓ'}
   i-sorts .# = ⊤
@@ -61,11 +65,10 @@ module MLTT-ITT {ℓ} {ℓ'} (m : MLTT {ℓ} {ℓ'}) where
 
 -- LC model of ITT
 
+-- Erases irrelevant stuff.
+
 module LC-ITT {ℓ} (l : LC {ℓ}) where
   open LC
-  open ITT 
-  open ITT-sorts 
-  open ITT-ctors
 
   i-sorts : ITT-sorts {lzero} {lzero} {ℓ}
   i-sorts .# = ⊥
@@ -99,3 +102,60 @@ module LC-ITT {ℓ} (l : LC {ℓ}) where
   i : ITT {lzero} {lzero} {ℓ}
   i .sorts = i-sorts
   i .ctors = i-ctors
+
+-- Fam(Set) model of ITT
+--
+-- Since we need to produce a second-order model of ITT, we must work in the
+-- internal language of Fam(Set). Luckily, this is (equivalent to) a presheaf
+-- category, specifically the functor category I → Set where I is the 'walking
+-- arrow'/interval category. Presheaf categories have an interpretation of
+-- dependent type theory, so we can just use reuse Agda's. However, in this
+-- category there is also a special object `P` which is (1, λ _ → 0) in
+-- Fam(Set). Any two inhabitants of P are equal. If we take functions out of
+-- this type `P → A`, it amounts to only looking at the 'set' component of A and
+-- ignoring the 'family' component.
+
+-- To that end, we interpret the relevant fragment of ITT using families of sets,
+-- and the irrelevant fragment using empty families of sets.
+
+module FamSet-ITT (P : Prop) where
+
+  i-sorts : ITT-sorts {lzero} {lsuc (lsuc lzero)} {lsuc lzero}
+  i-sorts .# = P
+  i-sorts .Ty = Set1
+  i-sorts .Tm z A = P → A
+  i-sorts .Tm ω A = A
+  [ i-sorts ] x = x
+  (↑[ i-sorts ] x) x₁ = x₁ x
+  [↑[ i-sorts ]]-id = refl
+  ↑[[ i-sorts ]]-id = refl
+
+  i-ctors : ITT-ctors i-sorts
+  i-ctors .Π z A B = (a : P → A) → B a
+  i-ctors .Π ω A B = (a : A) → B (λ _ → a)
+  i-ctors .lam {z} f = f
+  i-ctors .lam {ω} f = f
+  i-ctors .app {z} x a = x a
+  i-ctors .app {ω} x a = x a
+  i-ctors .lam-app {z} = refl
+  i-ctors .lam-app {ω} = refl
+  i-ctors .app-lam {z} = refl
+  i-ctors .app-lam {ω} = refl
+  i-ctors .U = Set
+  i-ctors .El X = Lift ((p : P) → X p)
+  i-ctors .Nat = Lift ℕ 
+  i-ctors .zero = lift ℕ.zero
+  i-ctors .succ n = lift (suc (n .lower))
+  i-ctors .elim-Nat X ze su (lift n) = elim
+    {A = λ k → X (λ _ → lift k)}
+    ze (λ k pk → su (lift k) pk) n 
+  i-ctors .elim-Nat-zero = refl
+  i-ctors .elim-Nat-succ = refl
+
+  i : ITT {lzero} {lsuc (lsuc lzero)} {lsuc lzero}
+  i .sorts = i-sorts
+  i .ctors = i-ctors
+
+
+
+
