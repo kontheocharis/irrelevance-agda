@@ -7,15 +7,12 @@ open import Cubical.Data.Unit
 open import Cubical.Data.Nat hiding (zero)
 
 open import Theories
+open import Gluing
 
 data ⊤ : Prop where
     tt : ⊤
 
 data ⊥ : Prop where
-
-propFunExt : ∀ {ℓ} {A : Prop} {B : A → Type ℓ} {f : (x : A) → B x} {g : (x : A) → B x}
-  → ((x : A) → f x ≡ g x) → f ≡ g
-propFunExt h i x = h x i
 
 exfalso : ∀ {ℓ} {A : Type ℓ} → ⊥ → A
 exfalso ()
@@ -105,15 +102,17 @@ module LC-ITT {ℓ} (l : LC {ℓ}) where
 
 -- Fam(Set) model of ITT
 --
+-- This is in a sense the "standard model" of ITT.
+--
 -- Since we need to produce a second-order model of ITT, we must work in the
 -- internal language of Fam(Set). Luckily, this is (equivalent to) a presheaf
 -- category, specifically the functor category I → Set where I is the 'walking
--- arrow'/interval category. Presheaf categories have an interpretation of
--- dependent type theory, so we can just use reuse Agda's. However, in this
--- category there is also a special object `P` which is (1, λ _ → 0) in
--- Fam(Set). Any two inhabitants of P are equal. If we take functions out of
--- this type `P → A`, it amounts to only looking at the 'set' component of A and
--- ignoring the 'family' component.
+-- arrow'/interval category. Equivalently it is the arrow category Set^→.
+-- Presheaf categories have an interpretation of dependent type theory, so we
+-- can just use reuse Agda's. Additionally in this category there is also a
+-- special object `P` which is (1, λ _ → 0) in Fam(Set). Any two inhabitants of
+-- P are equal. If we take functions out of this `P → A`, it amounts to only
+-- looking at the 'set' component of A and ignoring the 'family' component.
 
 -- To that end, we interpret the relevant fragment of ITT using families of sets,
 -- and the irrelevant fragment using empty families of sets.
@@ -157,5 +156,68 @@ module FamSet-ITT (P : Prop) where
   i .ctors = i-ctors
 
 
+-- Canonicity model of ITT
 
+-- This is a displayed model, so we must work in a glued category. Specifically,
+-- there is a functor Γ : I → Set from the syntax of I to closed terms. This is
+-- usually what is used for canonicity. However, this is not sufficient for us.
+-- Instead we want to build a functor Γ : I → Fam(Set), since we saw that the
+-- standard model of ITT lives there. We send a type A to its set of irrelevant
+-- closed terms a, and the family of relevant closed terms that project down to
+-- a. We then extend this functor to Γ! : Psh I → Fam(Set) by the free
+-- cocompletion. Gluing along this yields Fam(Set)/Γ!. Luckily, this is also a
+-- presheaf topos (Carboni and Johnson 1995, Sterling and Harper 2020)
 
+module canon-ITT (P : Prop) (Ψ : Prop) where
+
+  -- here we have the syntax of ITT that restricts to the irrelevant fragment.
+  -- In other words, when P is true, then # is true in the syntax. (Sterling and
+  -- Harper, sec 3.3)
+  syn : Ψ → ITT {lzero} {lsuc (lsuc lzero)} {lsuc lzero}
+  res : (ψ : Ψ) → P true ≡ (syn ψ .sorts .#) true
+  res-prop : (ψ : Ψ) → P ≡ (syn ψ .sorts .#)
+
+  _⇒# : (ψ : Ψ) → P → syn ψ .sorts .#
+  (ψ ⇒#) p = (transport (res ψ) ⟦ p ⟧) .fact
+
+  #⇒_ : (ψ : Ψ) → syn ψ .sorts .# → P
+  (#⇒ ψ) p = (transport (sym (res ψ)) ⟦ p ⟧) .fact
+
+  -- We need to make a displayed model over the syntax
+  i-sorts : [ ITT-sorts {lzero} {lsuc (lsuc lzero)} {lsuc lzero} ∣ ψ ∈ Ψ ↪ syn ψ .sorts ]
+  i-sorts .fst .# = P
+  i-sorts .fst .Ty = G[ A ∈ (λ ψ → syn ψ .Ty) ] [ Set1 ∣ ψ ∈ Ψ ↪ syn ψ .Tm ω (A ψ) ]
+  i-sorts .fst .Tm ω A = A .snd .fst
+  i-sorts .fst .Tm z A
+    = G[ a ∈ (λ ψ → syn ψ .Tm z (A .fst ψ)) ]
+      [ (P → A .snd .fst) ∣ ψ ∈ Ψ ↪
+        (λ p → give ψ
+          (λ _ → syn ψ .Tm ω (A .fst ψ)) (A .snd)
+          (syn ψ .↑[_]_ ((ψ ⇒#) p) (a ψ))  ) ]
+  [ i-sorts .fst ] {A} x
+    = (λ ψ → syn ψ .[_] λ h → give' ψ (λ _ → syn ψ .Tm ω (A .fst ψ)) (A .snd) (x ((#⇒ ψ) h)))
+    , x
+    ,  λ ψ → propFunExt (λ p → {! !}) 
+    -- ,  λ ψ → {! propFunExt (λ p → sym (give-give' ψ (λ _ → syn ψ .Tm ω (A .fst ψ)) (A .snd) ?)) !}
+  (↑[ i-sorts .fst ] x) x₁ = x₁ .snd .fst x
+  [↑[ i-sorts .fst ]]-id = {! !}
+  ↑[[ i-sorts .fst ]]-id = refl
+  i-sorts .snd ψ i .# = (res-prop ψ) i 
+  i-sorts .snd ψ i .Ty = G-collapses ψ {(λ ψ → syn ψ .Ty)}
+                  {λ A → [ Set1 ∣ ψ ∈ Ψ ↪ syn ψ .Tm ω (A ψ) ]} {{ext-⋆}} i
+  i-sorts .snd ψ i .Tm ω A = {! A .snd!}
+  i-sorts .snd ψ i .Tm z A = {! !}
+  [ i-sorts .snd ψ i ] = {!!}
+  i-sorts .snd ψ i .↑[_]_ = {!!}
+  [↑[ i-sorts .snd ψ i ]]-id = {!!}
+  ↑[[ i-sorts .snd ψ i ]]-id = {!!}
+
+  i-ctors : [ ITT-ctors (* i-sorts) ∣ ψ ∈ Ψ ↪ *coe ψ ITT-ctors i-sorts (syn ψ .ctors)  ]
+  i-ctors .fst = {!!}
+  i-ctors .snd = {!!}
+
+  i : [ ITT {lzero} {lsuc (lsuc lzero)} {lsuc lzero} ∣ Ψ ↪ syn ]
+  i .fst .sorts = * i-sorts
+  i .fst .ctors = * i-ctors 
+  i .snd ψ i .sorts = (i-sorts ＠ ψ) i 
+  i .snd ψ i .ctors = {! !}
