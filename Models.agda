@@ -77,8 +77,8 @@ module ITT-MLTT1 {ℓ} {ℓ'} (i : ITT {lzero} {ℓ} {ℓ'}) where
 
   m-ctors : MLTT-ctors m-sorts
   m-ctors .Π = i .Π z -- z or ω doesn't matter here
-  m-ctors .lam x =  [ (λ p → i .lam (λ t → {! !})) ]
-  m-ctors .app = {!!}
+  m-ctors .lam x = i .[_] (λ p → i .lam {z} (λ y → i .↑[_]_ p (x y)))
+  m-ctors .app x y = {! i .[_] (λ p → app [x] ) !}
   m-ctors .lam-app = {!!}
   m-ctors .app-lam = {!!}
   m-ctors .U = {!!}

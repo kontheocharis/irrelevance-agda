@@ -80,10 +80,10 @@ module _ (sorts : ITT-sorts {ℓp} {ℓty} {ℓtm}) where
       f g h : (a : Tm _ _) → Tm _ _
       eq : _ ≡ _
       
-    [_]* : Tm i A → Tm z A
-    [_]* {i = z} t = t
-    [_]* {i = ω} t = [ (λ _ → t) ]
-  
+  [_]* : Tm i A → Tm z A
+  [_]* {i = z} t = t
+  [_]* {i = ω} t = [ (λ _ → t) ]
+      
   record ITT-ctors : Type (lsuc (ℓp ⊔ ℓty ⊔ ℓtm)) where
     field
       -- Pi types
@@ -111,6 +111,68 @@ module _ (sorts : ITT-sorts {ℓp} {ℓty} {ℓtm}) where
       -- Computation for elim-Nat
       elim-Nat-zero : ∀ {mz ms} → elim-Nat X mz ms zero ≡ mz
       elim-Nat-succ : ∀ {mz ms n} → elim-Nat X mz ms (succ n) ≡ ms n (elim-Nat X mz ms n)
+
+    -- irrelevant fragment
+    lamz : ((a : Tm j A) → Tm z (X [ a ]*)) → Tm z (Π j A X)
+    lamz f = [ (λ p → lam (λ x → ↑[ p ] (f x)) ) ]
+
+    lamz' : ((a : Tm z A) → Tm z (X a)) → Tm z (Π j A X)
+    lamz' f = [ (λ p → lam (λ x → ↑[ p ] (f [ x ]*)) ) ]
+
+    appz : Tm z (Π j A X) → (a : Tm j A) → Tm z (X [ a ]*)
+    appz f x = [ (λ p → app (↑[ p ] f) x) ]
+
+    appz' : Tm z (Π j A X) → (a : Tm z A) → Tm z (X a)
+    appz' {j = z} f x = [ (λ p → app (↑[ p ] f) x) ]
+    appz' {j = ω} {X = X} f x = [ (λ p → coe (cong X [↑[_]]-id) (app (↑[ p ] f) (↑[ p ] x) )) ]
+
+    lamz-appz : lamz {j} (appz t) ≡ t
+    lamz-appz {t = t} =
+      (λ i → [ ( λ p → lam (λ x → ↑[[_]]-id {t# =  λ _ → app (↑[ p ] t) x} i p)) ])
+      ∙ ( λ i → [ (λ p →  lam-app {t = ↑[ p ] t} i) ])
+      ∙ [↑[_]]-id
+
+    appz-lamz : appz {j} (lamz f) t ≡ f t
+    appz-lamz {f = f} {t = t} =
+      ( λ i → [ (λ p → app (↑[[_]]-id {t# =  λ _ → lam (λ x → ↑[ p ] f x)} i p) t ) ])
+      ∙ ( λ i → [ (λ p → app-lam {f = λ x → ↑[ p ] f x} {t = t} i) ])
+      ∙ [↑[_]]-id
+
+    lamz-appz' : lamz' {X = X} {j = j} (appz' t) ≡ t
+    lamz-appz' {j = z} {t = t} = lamz-appz
+    lamz-appz' {X = X} {j = ω} {t = t} =
+      (λ i → [ ( λ p → lam (λ x → ↑[[_]]-id {t# =  λ _ →  coe (cong X [↑[_]]-id) (app (↑[ p ] t) (↑[ p ] ([ x ]*)) ) } i p)) ])
+      ∙ (λ i → [ (λ p → {!  !}) ])  -- UMMMM
+      ∙ [↑[_]]-id
+
+    appz-lamz' : appz' {j = j} {X = X} (lamz' f) t ≡ f t
+    appz-lamz' {j = z} {X = X} {f = f} {t = t} = appz-lamz
+    appz-lamz' {j = ω} {X = X} {f = f} {t = t} =
+      (λ i → [ (λ p → coe (cong X [↑[_]]-id) ({!!})) ])
+      ∙ {!!} -- Just usual cubical BS
+      ∙ [↑[_]]-id
+
+    zeroz : Tm z Nat
+    zeroz = [ zero ]*
+
+    succz : Tm z Nat → Tm z Nat
+    succz n = [ (λ p → succ (↑[ p ] n)) ]
+
+    elim-Natz : (X : Tm z Nat → Ty)
+      → (Tm z (X zeroz))
+      → ((n : Tm z Nat) → Tm z (X n) → Tm z (X (succz n)))
+      → (n : Tm z Nat) → Tm z (X n)
+    elim-Natz X ze su n = coe (cong X [↑[_]]-id)
+      [ (λ p → elim-Nat X (↑[ p ] ze) (λ k pk → coe ( λ i → X [ (λ p → succ (↑[[_]]-id {t# = λ _ → k} i p)) ])
+        (↑[ p ] (su [ k ]* [ pk ]*))) (↑[ p ] n)) ]
+
+    -- Computation for elim-Nat
+    elim-Nat-zeroz : ∀ {mz ms} → elim-Natz X mz ms zeroz ≡ mz
+    elim-Nat-zeroz = {! !}
+
+    elim-Nat-succz : ∀ {mz ms n} → elim-Natz X mz ms (succz n) ≡ ms n (elim-Natz X mz ms n)
+    elim-Nat-succz = {! !}
+
 
 record ITT {ℓp} {ℓty} {ℓtm} : Type (lsuc (ℓp ⊔ ℓty ⊔ ℓtm)) where
   field
